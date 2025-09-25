@@ -234,8 +234,8 @@ async function buscaClientePorCampo(valorExato) {
 
 async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
   let after = null;
-  for (let i = 0; i < 3; i++) { // reduzido para debug
-    console.log("🔎 [DEBUG] Buscando cliente por título:", tituloCPF, "ou dígitos:", digitsCPF);
+  for (let i = 0; i < 50; i++) { // até 50 páginas x 100 registros = 5000
+    console.log(`🔎 [DEBUG] Buscando cliente por título: "${tituloCPF}" ou dígitos: "${digitsCPF}", página ${i + 1}`);
 
     const query = `
       query($id: ID!, $first: Int!, $after: String) {
@@ -247,30 +247,36 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
         }
       }
     `;
-    const j = await gql(query, { id: tableId, first: 5000, after });
-    console.log("📄 [DEBUG] Página retornada:", j.data?.table?.table_records?.edges?.map(e => e.node.title));
 
+    const j = await gql(query, { id: tableId, first: 100, after });
     const edges = j.data?.table?.table_records?.edges || [];
+    const pageInfo = j.data?.table?.table_records?.pageInfo;
 
-    let found = edges.map((e) => e.node).find((n) => (n.title || "").trim() === tituloCPF);
+    console.log("📄 [DEBUG] Página retornada:", edges.map(e => e.node.title));
+    console.log(`📄 [DEBUG] hasNextPage=${pageInfo?.hasNextPage}, endCursor=${pageInfo?.endCursor}`);
+
+    let found = edges.map(e => e.node).find(n => (n.title || "").trim() === tituloCPF);
     if (found) {
       console.log("✅ [DEBUG] Encontrado por título exato:", found);
       return found;
     }
 
     if (digitsCPF) {
-      found = edges.map((e) => e.node).find((n) => onlyDigits(n.title) === digitsCPF);
+      found = edges.map(e => e.node).find(n => onlyDigits(n.title) === digitsCPF);
       if (found) {
         console.log("✅ [DEBUG] Encontrado por dígitos:", found);
         return found;
       }
     }
 
-    const pageInfo = j.data?.table?.table_records?.pageInfo;
-    if (!pageInfo?.hasNextPage) break;
+    if (!pageInfo?.hasNextPage) {
+      console.log("⛔ [DEBUG] Fim da tabela alcançado.");
+      break;
+    }
     after = pageInfo.endCursor;
   }
-  console.log("❌ [DEBUG] Cliente não localizado por título.");
+
+  console.log("❌ [DEBUG] Cliente não localizado por título nem dígitos.");
   return null;
 }
 
@@ -444,6 +450,7 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+
 
 
 

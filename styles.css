@@ -1,0 +1,111 @@
+:root{
+  --bg:#f8f6ef;
+  --panel:#ffffff;
+  --beige:#cfc5a2;
+  --beige-700:#bdb08a;
+  --text:#2b2d42;
+  --muted:#6b7280;
+  --red:#e63946;
+  --red-700:#d62839;
+  --border:#e6e2d6;
+  --shadow:0 10px 30px rgba(0,0,0,.06);
+  --radius:14px;
+  --radius-sm:10px;
+  --radius-xs:8px;
+  --gap:16px;
+  --font: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Helvetica Neue", sans-serif;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; font-family:var(--font); color:var(--text); background:var(--bg);
+}
+
+/* Topbar (bege) */
+.topbar{
+  background:var(--beige);
+  border-bottom:1px solid var(--beige-700);
+}
+.topbar__inner{
+  max-width:1100px; margin:0 auto;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px;
+}
+.brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.5px}
+.brand__logo{width:40px;height:40px;border-radius:12px;background:var(--red);color:#fff;display:grid;place-items:center;font-weight:800}
+.brand__text{text-transform:uppercase}
+.menu{display:flex; gap:14px; align-items:center}
+.menu__item{opacity:.8}
+.menu__item.is-active{font-weight:600}
+.menu__cta{background:var(--red);color:#fff;padding:8px 14px;border-radius:999px;text-decoration:none}
+.menu a{color:inherit;text-decoration:none}
+
+/* Página */
+.page{max-width:900px;margin:40px auto;padding:0 16px}
+.page__title{font-size:32px;margin:0 0 10px}
+
+/* Busca */
+.search{display:flex;gap:10px;margin:14px 0 8px}
+.search__input{
+  flex:1; padding:14px 16px; border:1px solid var(--border); border-radius:999px; background:#fff;
+}
+.btn{padding:12px 18px;border-radius:999px;border:1px solid transparent;cursor:pointer}
+.btn--primary{background:var(--red);color:#fff}
+.btn--primary:hover{background:var(--red-700)}
+.muted{color:var(--muted);font-size:.95rem}
+
+/* Resultado */
+.result{display:flex;flex-direction:column;gap:22px;margin-top:14px}
+
+/* Grupo por AIT */
+.group{
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:var(--radius); box-shadow:var(--shadow); padding:14px;
+}
+.group__hdr{
+  display:flex; align-items:center; gap:10px; padding:6px 6px 10px 6px;
+  border-bottom:1px dashed var(--border); margin-bottom:10px;
+}
+.group__title{font-size:18px;margin:0}
+
+/* Card */
+.card{
+  background:#fff; border:1px dashed var(--border); border-radius:var(--radius-sm);
+  padding:10px; margin:10px 0;
+}
+.card__hdr{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.card__title{font-weight:600}
+.card__body{display:flex;flex-wrap:wrap;gap:10px}
+.card--error{border-color:var(--red);background:#fff5f6}
+.spacer{flex:1}
+
+/* Badges / pills */
+.badge{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:.8rem; padding:6px 10px; border-radius:999px;
+  background:#f3f0e3; border:1px solid var(--border);
+}
+.badge--muted{background:#f6f6f6}
+.badge--success{background:#e9f8ee; border-color:#bfe5cc; color:#11693a}
+.badge--link{background:#eef7ff;border-color:#cfe7ff;color:#0059a8;text-decoration:none}
+.badge--link:hover{filter:brightness(.98)}
+
+.pill{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; min-width:260px; padding:12px 14px;
+  border:1px solid var(--border); border-radius:var(--radius-xs);
+  background:#faf9f5; text-decoration:none; color:inherit;
+}
+.pill:hover{background:#f6f3ea}
+.pill__meta{font-size:.8rem;color:var(--muted)}
+
+/* Vazio */
+.empty{
+  border:1px dashed var(--border); background:#fff; border-radius:var(--radius);
+  padding:22px; text-align:center; color:var(--muted);
+}
+
+/* Rodapé */
+.footer{margin:28px 0 40px; text-align:center; color:var(--muted)}
+.footer .heart{color:var(--red)}

@@ -321,48 +321,30 @@ app.get("/api/anexos", async (req, res) => {
     }
 
 function montar(cards, pipeId) {
+  return cards.map((card) => {
+    // procurar campo AIT
+    const aitField = (card.fields || []).find((f) =>
+      /(^|\W)ait(\W|$)/i.test(f.field?.label || "")
+    );
+    const ait = aitField ? aitField.value : null;
 
-    // Modo deep: "0" (off), "1" (force), "auto" (fallback)
-    const deepForce = deepParam === "1";
-    const deepOff = deepParam === "0";
+    // procurar campo Comprovante Protocolo
+    const comprovanteField = (card.fields || []).find((f) =>
+      /comprovante\s*protocolo/i.test(f.field?.label || "")
+    );
+    const comprovanteProtocolo = comprovanteField ? comprovanteField.value : null;
 
-    // 1ª passada rápida (deep=false), paralela
-    let results = await Promise.all(pipeIds.map((id) => coletaCardsDePipe(id, deepForce)));
-    let cardsResult = [];
-    results.forEach(({ cards }, idx) => (cardsResult = cardsResult.concat(montar(cards, pipeIds[idx]))));
-
-    // fallback automático se nada encontrado e deep ≠ 0
-    let deepAutoUsed = false;
-    if (!cardsResult.length && !deepOff && !deepForce) {
-      deepAutoUsed = true;
-      results = await Promise.all(pipeIds.map((id) => coletaCardsDePipe(id, true)));
-      cardsResult = [];
-      results.forEach(({ cards }, idx) => (cardsResult = cardsResult.concat(montar(cards, pipeIds[idx]))));
-    }
-
-    const response = { cpf: cpfInput, cliente, cards: cardsResult };
-    if (debugFlag) {
-      response.debug = {
-        perPipe: results.map((r, i) => ({ pipeId: pipeIds[i], ...r.counts })),
-        timeMs: Date.now() - t0,
-        deepMode: deepForce ? "force" : deepOff ? "off" : deepAutoUsed ? "auto-fallback" : "fast",
-        fromCache: false,
-      };
-    }
-
-    if (!noCache) setCache(cacheKey, response);
-    return res.json(response);
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
-});
+    return {
+      pipeId,
+      cardId: card.id,
+      title: card.title,
+      ait,
+      comprovanteProtocolo,
+    };
+  });
+}
 
 // ------------------------- start -------------------------
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
-
-
-
-
-

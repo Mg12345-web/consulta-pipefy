@@ -4,7 +4,7 @@ import fetch from "node-fetch";
 import https from "https";
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 const PIPEFY_GQL = "https://api.pipefy.com/graphql";
 
 // servir arquivos estáticos (./public)
@@ -58,12 +58,12 @@ const mapAnexos = (att = []) =>
   att
     .map((a) => {
       const url = a?.url || "";
-      const filename =
-        a?.name || decodeURIComponent(url.split("?")[0].split("/").pop() || "");
+      const filename = decodeURIComponent(url.split("?")[0].split("/").pop() || "");
       return {
         filename: filename || null,
         url,
         createdAt: a?.createdAt || null,
+        // flag simples por nome (reforçamos depois com o código do AIT)
         isAIT: /(^|[^a-z])ait([^a-z]|$)/i.test(filename),
       };
     })
@@ -99,7 +99,7 @@ app.get("/api/anexos-by-card", async (req, res) => {
         card(id: $id) {
           id
           title
-          attachments { url createdAt name }
+          attachments { url createdAt }
         }
       }
     `;
@@ -112,7 +112,9 @@ app.get("/api/anexos-by-card", async (req, res) => {
     return res.json({
       cardId: card?.id || null,
       title: card?.title || null,
-      protocolo: anexos[0] || null,  // <- só o último
+      ait: anexos.find((x) => x.isAIT) || null,
+      ultimoAnexo: anexos[0] || null,
+      anexos,
     });
   } catch (e) {
     return res.status(500).json({ error: String(e) });
@@ -214,71 +216,49 @@ app.get("/api/anexos", async (req, res) => {
     }
 
     // ---- localizar cliente (por campo CPF e/ou por título com paginação) ----
-    // ---- localizar cliente (por campo CPF e/ou por título com paginação) ----
-async function buscaClientePorCampo(valorExato) {
-  if (!cpfFieldId) return null;
-  console.log("🔎 [DEBUG] Buscando cliente por campo CPF:", valorExato);
-
-  const query = `
-    query($tableId: ID!, $cpfFieldId: ID!, $cpf: String!) {
-      table_record_search(table_id: $tableId, field_id: $cpfFieldId, field_value: $cpf, first: 1) {
-        edges { node { id title } }
-      }
-    }
-  `;
-  const j = await gql(query, { tableId, cpfFieldId, cpf: valorExato });
-  console.log("📄 [DEBUG] Resultado buscaCampo:", JSON.stringify(j, null, 2));
-
-  return j.data?.table_record_search?.edges?.[0]?.node || null;
-}
-
-async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
-  let after = null;
-  for (let i = 0; i < 50; i++) { // até 50 páginas x 100 registros = 5000
-    console.log(`🔎 [DEBUG] Buscando cliente por título: "${tituloCPF}" ou dígitos: "${digitsCPF}", página ${i + 1}`);
-
-    const query = `
-      query($id: ID!, $first: Int!, $after: String) {
-        table(id: $id) {
-          table_records(first: $first, after: $after) {
-            pageInfo { hasNextPage endCursor }
+    async function buscaClientePorCampo(valorExato) {
+      if (!cpfFieldId) return null;
+      const query = `
+        query($tableId: ID!, $cpfFieldId: ID!, $cpf: String!) {
+          table_record_search(table_id: $tableId, field_id: $cpfFieldId, field_value: $cpf, first: 1) {
             edges { node { id title } }
           }
         }
+      `;
+      const j = await gql(query, { tableId, cpfFieldId, cpf: valorExato });
+      return j.data?.table_record_search?.edges?.[0]?.node || null;
+    }
+
+    async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
+      let after = null;
+      for (let i = 0; i < 50; i++) {
+        const query = `
+          query($id: ID!, $first: Int!, $after: String) {
+            table(id: $id) {
+              table_records(first: $first, after: $after) {
+                pageInfo { hasNextPage endCursor }
+                edges { node { id title } }
+              }
+            }
+          }
+        `;
+        const j = await gql(query, { id: tableId, first: 100, after });
+        const edges = j.data?.table?.table_records?.edges || [];
+
+        let found = edges.map((e) => e.node).find((n) => (n.title || "").trim() === tituloCPF);
+        if (found) return found;
+
+        if (digitsCPF) {
+          found = edges.map((e) => e.node).find((n) => onlyDigits(n.title) === digitsCPF);
+          if (found) return found;
+        }
+
+        const pageInfo = j.data?.table?.table_records?.pageInfo;
+        if (!pageInfo?.hasNextPage) break;
+        after = pageInfo.endCursor;
       }
-    `;
-
-    const j = await gql(query, { id: tableId, first: 100, after });
-    const edges = j.data?.table?.table_records?.edges || [];
-    const pageInfo = j.data?.table?.table_records?.pageInfo;
-
-    console.log("📄 [DEBUG] Página retornada:", edges.map(e => e.node.title));
-    console.log(`📄 [DEBUG] hasNextPage=${pageInfo?.hasNextPage}, endCursor=${pageInfo?.endCursor}`);
-
-    let found = edges.map(e => e.node).find(n => (n.title || "").trim() === tituloCPF);
-    if (found) {
-      console.log("✅ [DEBUG] Encontrado por título exato:", found);
-      return found;
+      return null;
     }
-
-    if (digitsCPF) {
-      found = edges.map(e => e.node).find(n => onlyDigits(n.title) === digitsCPF);
-      if (found) {
-        console.log("✅ [DEBUG] Encontrado por dígitos:", found);
-        return found;
-      }
-    }
-
-    if (!pageInfo?.hasNextPage) {
-      console.log("⛔ [DEBUG] Fim da tabela alcançado.");
-      break;
-    }
-    after = pageInfo.endCursor;
-  }
-
-  console.log("❌ [DEBUG] Cliente não localizado por título nem dígitos.");
-  return null;
-}
 
     const digits = onlyDigits(cpfInput);
     let cliente = await buscaClientePorCampo(cpfInput);
@@ -291,7 +271,6 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
     }
 
     // ---- queries (com fields para extrair AIT sem chamada extra) ----
-    console.log(`🔗 [DEBUG] Buscando cards no pipe ${pipeId} para cliente ${cliente.id} (${cliente.title})`);
     const Q_PIPE_BY_CONNECTOR = `
       query($pipeId: ID!, $recordId: ID!, $first: Int!, $after: String) {
         pipe(id: $pipeId) {
@@ -301,7 +280,7 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
               id
               title
               fields { value field { id label type } }
-              attachments { url createdAt name }
+              attachments { url createdAt }
             } }
           }
         }
@@ -319,7 +298,7 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
               id
               title
               fields { value field { id label type } }
-              attachments { url createdAt name }
+              attachments { url createdAt }
             } }
           }
         }
@@ -375,44 +354,41 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
     }
 
     function montar(cards, pipeId) {
-  return cards.map((card) => {
-    const anexos = mapAnexos(card.attachments);
+      return cards.map((card) => {
+        const anexos = mapAnexos(card.attachments);
 
-    // pega somente o último (mais recente)
-    const ultimo = anexos[0] || null;
+        // extrair AIT dos fields
+        let aitValue = null;
+        if (AIT_FIELD_ID) {
+          const byId = (card.fields || []).find((f) => (f.field?.id || "") === AIT_FIELD_ID);
+          if (byId) aitValue = byId.value || null;
+        }
+        if (!aitValue) {
+          const byLabel = (card.fields || []).find((f) => /(^|\W)ait(\W|$)/i.test(f.field?.label || ""));
+          if (byLabel) aitValue = byLabel.value || null;
+        }
 
-    // extrair AIT dos fields
-    let aitValue = null;
-    if (AIT_FIELD_ID) {
-      const byId = (card.fields || []).find((f) => (f.field?.id || "") === AIT_FIELD_ID);
-      if (byId) aitValue = byId.value || null;
-    }
-    if (!aitValue) {
-      const byLabel = (card.fields || []).find((f) => /(^|\W)ait(\W|$)/i.test(f.field?.label || ""));
-      if (byLabel) aitValue = byLabel.value || null;
-    }
+        let anexoAIT = null;
+        if (aitValue) {
+          const code = String(aitValue).toUpperCase();
+          anexoAIT = anexos.find((a) => (a.filename || "").toUpperCase().includes(code)) || null;
+          anexos.forEach((a) => {
+            if ((a.filename || "").toUpperCase().includes(code)) a.isAIT = true;
+          });
+        }
 
-    let anexoAIT = null;
-    if (aitValue) {
-      const code = String(aitValue).toUpperCase();
-      anexoAIT = anexos.find((a) => (a.filename || "").toUpperCase().includes(code)) || null;
-      anexos.forEach((a) => {
-        if ((a.filename || "").toUpperCase().includes(code)) a.isAIT = true;
+        return {
+          pipeId,
+          cardId: card.id,
+          title: card.title,
+          ait: aitValue || null,
+          anexoAIT,
+          ultimoAnexo: anexos[0] || null,
+          anexos,
+        };
       });
     }
 
-    return {
-      pipeId,
-      cardId: card.id,
-      title: card.title,
-      protocolo: ultimo,     // último anexo
-      anexos,                // <-- lista completa para o index
-      ait: aitValue || null, // opcional
-      anexoAIT,
-    };
-  });
-}
-        
     // Modo deep: "0" (off), "1" (force), "auto" (fallback)
     const deepForce = deepParam === "1";
     const deepOff = deepParam === "0";
@@ -448,13 +424,7 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+// ------------------------- start -------------------------
+app.listen(PORT, () => {
+  console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
-
-
-
-
-
-
-

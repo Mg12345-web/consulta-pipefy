@@ -214,49 +214,65 @@ app.get("/api/anexos", async (req, res) => {
     }
 
     // ---- localizar cliente (por campo CPF e/ou por título com paginação) ----
-    async function buscaClientePorCampo(valorExato) {
-      if (!cpfFieldId) return null;
-      const query = `
-        query($tableId: ID!, $cpfFieldId: ID!, $cpf: String!) {
-          table_record_search(table_id: $tableId, field_id: $cpfFieldId, field_value: $cpf, first: 1) {
+    // ---- localizar cliente (por campo CPF e/ou por título com paginação) ----
+async function buscaClientePorCampo(valorExato) {
+  if (!cpfFieldId) return null;
+  console.log("🔎 [DEBUG] Buscando cliente por campo CPF:", valorExato);
+
+  const query = `
+    query($tableId: ID!, $cpfFieldId: ID!, $cpf: String!) {
+      table_record_search(table_id: $tableId, field_id: $cpfFieldId, field_value: $cpf, first: 1) {
+        edges { node { id title } }
+      }
+    }
+  `;
+  const j = await gql(query, { tableId, cpfFieldId, cpf: valorExato });
+  console.log("📄 [DEBUG] Resultado buscaCampo:", JSON.stringify(j, null, 2));
+
+  return j.data?.table_record_search?.edges?.[0]?.node || null;
+}
+
+async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
+  let after = null;
+  for (let i = 0; i < 3; i++) { // reduzido para debug
+    console.log("🔎 [DEBUG] Buscando cliente por título:", tituloCPF, "ou dígitos:", digitsCPF);
+
+    const query = `
+      query($id: ID!, $first: Int!, $after: String) {
+        table(id: $id) {
+          table_records(first: $first, after: $after) {
+            pageInfo { hasNextPage endCursor }
             edges { node { id title } }
           }
         }
-      `;
-      const j = await gql(query, { tableId, cpfFieldId, cpf: valorExato });
-      return j.data?.table_record_search?.edges?.[0]?.node || null;
-    }
-
-    async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
-      let after = null;
-      for (let i = 0; i < 50; i++) {
-        const query = `
-          query($id: ID!, $first: Int!, $after: String) {
-            table(id: $id) {
-              table_records(first: $first, after: $after) {
-                pageInfo { hasNextPage endCursor }
-                edges { node { id title } }
-              }
-            }
-          }
-        `;
-        const j = await gql(query, { id: tableId, first: 100, after });
-        const edges = j.data?.table?.table_records?.edges || [];
-
-        let found = edges.map((e) => e.node).find((n) => (n.title || "").trim() === tituloCPF);
-        if (found) return found;
-
-        if (digitsCPF) {
-          found = edges.map((e) => e.node).find((n) => onlyDigits(n.title) === digitsCPF);
-          if (found) return found;
-        }
-
-        const pageInfo = j.data?.table?.table_records?.pageInfo;
-        if (!pageInfo?.hasNextPage) break;
-        after = pageInfo.endCursor;
       }
-      return null;
+    `;
+    const j = await gql(query, { id: tableId, first: 10, after });
+    console.log("📄 [DEBUG] Página retornada:", j.data?.table?.table_records?.edges?.map(e => e.node.title));
+
+    const edges = j.data?.table?.table_records?.edges || [];
+
+    let found = edges.map((e) => e.node).find((n) => (n.title || "").trim() === tituloCPF);
+    if (found) {
+      console.log("✅ [DEBUG] Encontrado por título exato:", found);
+      return found;
     }
+
+    if (digitsCPF) {
+      found = edges.map((e) => e.node).find((n) => onlyDigits(n.title) === digitsCPF);
+      if (found) {
+        console.log("✅ [DEBUG] Encontrado por dígitos:", found);
+        return found;
+      }
+    }
+
+    const pageInfo = j.data?.table?.table_records?.pageInfo;
+    if (!pageInfo?.hasNextPage) break;
+    after = pageInfo.endCursor;
+  }
+  console.log("❌ [DEBUG] Cliente não localizado por título.");
+  return null;
+}
 
     const digits = onlyDigits(cpfInput);
     let cliente = await buscaClientePorCampo(cpfInput);
@@ -428,6 +444,7 @@ app.get("/api/anexos", async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+
 
 
 

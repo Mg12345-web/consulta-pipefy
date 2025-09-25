@@ -321,21 +321,6 @@ app.get("/api/anexos", async (req, res) => {
     }
 
 function montar(cards, pipeId) {
-  return cards.map((card) => {
-    // procurar diretamente o campo "Comprovante Protocolo"
-    const comprovanteProtocolo = (card.fields || []).find((f) =>
-      /comprovante\s*protocolo/i.test(f.field?.label || "")
-    )?.value || null;
-
-    return {
-      pipeId,
-      cardId: card.id,
-      title: card.title,
-      ait: aitValue || null,
-      comprovanteProtocolo,
-    };
-  });
-}
 
     // Modo deep: "0" (off), "1" (force), "auto" (fallback)
     const deepForce = deepParam === "1";
@@ -376,6 +361,7 @@ function montar(cards, pipeId) {
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
+
 
 
 

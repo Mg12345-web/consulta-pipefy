@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Consulta de Anexos • Pipefy</title>
+  <link rel="stylesheet" href="/styles.css?v=mg3">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="brand">
+        <div class="brand__logo">MG</div>
+        <div class="brand__text">Multas</div>
+      </div>
+      <nav class="menu">
+        <a class="menu__item is-active">Consulta</a>
+        <a class="menu__item" href="#">Serviços</a>
+        <a class="menu__item" href="#">Contato</a>
+        <a class="menu__cta" href="tel:+5531992726836">(31) 99272-6836</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    <h1 class="page__title">Consulte seu processo</h1>
+
+    <form id="form" class="search">
+      <input id="cpf" class="search__input" type="text" placeholder="CPF (ex: 103.142.726-07)" />
+      <button class="btn btn--primary" type="submit">Enviar</button>
+    </form>
+    <p class="muted">Digite o CPF com ou sem pontuação. Os resultados serão <b>agrupados por AIT</b>.</p>
+
+    <section id="result" class="result"></section>
+
+    <footer class="footer">
+      <span>Feito com <span class="heart">❤</span> • Pipefy API</span>
+    </footer>
+  </main>
+
+  <script>
+    const elForm = document.getElementById('form');
+    const elCpf  = document.getElementById('cpf');
+    const elOut  = document.getElementById('result');
+
+    const fmt = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+    elForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const cpf = elCpf.value.trim();
+      if (!cpf) return;
+
+      elOut.innerHTML = `<div class="card"><div class="card__body">Buscando…</div></div>`;
+
+      try {
+        const r = await fetch(`/api/anexos?cpf=${encodeURIComponent(cpf)}`);
+        const data = await r.json();
+        render(data, cpf);
+      } catch (err) {
+        elOut.innerHTML = `<div class="card card--error"><div class="card__body">Erro: ${String(err)}</div></div>`;
+      }
+    });
+
+    function render(data, cpfDigitado) {
+      if (!data || !Array.isArray(data.cards) || data.cards.length === 0) {
+        elOut.innerHTML = `
+          <div class="empty">
+            <h3>Nenhum card encontrado para <b>${cpfDigitado}</b>.</h3>
+          </div>`;
+        return;
+      }
+
+      // agrupar por AIT (chave: valor do campo AIT; “Sem AIT” quando vazio)
+      const grupos = {};
+      for (const c of data.cards) {
+        const key = (c.ait && String(c.ait).trim()) ? String(c.ait).trim() : 'Sem AIT';
+        if (!grupos[key]) grupos[key] = [];
+        grupos[key].push(c);
+      }
+
+      const blocks = [];
+      for (const ait of Object.keys(grupos)) {
+        const cards = grupos[ait];
+
+        const cardsHtml = cards.map(card => {
+          const anexos = (card.anexos || []).map(a => `
+            <a class="pill" href="${a.url}" target="_blank" rel="noopener">
+              ${a.filename || 'arquivo'}
+              ${a.createdAt ? `<span class="pill__meta">${fmt.format(new Date(a.createdAt))}</span>` : ''}
+            </a>
+          `).join('');
+
+          return `
+            <div class="card">
+              <div class="card__hdr">
+                <div class="badge badge--muted">Card:</div>
+                <div class="card__title">${card.title || card.cardId}</div>
+                <a class="badge badge--link" href="https://app.pipefy.com/open-cards/${card.cardId}" target="_blank">abrir no Pipefy ↗</a>
+                <div class="spacer"></div>
+                <div class="badge">pipe ${card.pipeId}</div>
+                ${card.ait ? `<span class="badge badge--success">AIT: ${card.ait}</span>` : ''}
+              </div>
+              <div class="card__body">
+                ${anexos || '<div class="muted">Sem anexos neste card.</div>'}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        blocks.push(`
+          <section class="group">
+            <div class="group__hdr">
+              <h2 class="group__title">AIT: ${ait}</h2>
+              <div class="badge">${cards.length} card(s)</div>
+              <div class="spacer"></div>
+              <div class="badge badge--muted">
+                ${cards.reduce((acc, c) => acc + (c.anexos?.length || 0), 0)} anexo(s)
+              </div>
+            </div>
+            ${cardsHtml}
+          </section>
+        `);
+      }
+
+      elOut.innerHTML = blocks.join('');
+    }
+  </script>
+</body>
+</html>

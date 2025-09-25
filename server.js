@@ -320,18 +320,19 @@ app.get("/api/anexos", async (req, res) => {
       return { cards, counts: { byConnector: edgesConnector.length, byTitleViaPhases: edgesPhase.length } };
     }
 
-    function montar(cards, pipeId) {
+function montar(cards, pipeId) {
   return cards.map((card) => {
-    // procurar o campo "Comprovante Protocolo"
-    const comprovanteField = (card.fields || []).find((f) => 
+    // procurar diretamente o campo "Comprovante Protocolo"
+    const comprovanteProtocolo = (card.fields || []).find((f) =>
       /comprovante\s*protocolo/i.test(f.field?.label || "")
-    );
+    )?.value || null;
 
     return {
       pipeId,
       cardId: card.id,
       title: card.title,
-      comprovanteProtocolo: comprovanteField ? comprovanteField.value : null,
+      ait: aitValue || null,
+      comprovanteProtocolo,
     };
   });
 }
@@ -375,6 +376,7 @@ app.get("/api/anexos", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
+
 
 
 

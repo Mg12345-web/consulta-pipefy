@@ -247,7 +247,7 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
         }
       }
     `;
-    const j = await gql(query, { id: tableId, first: 10, after });
+    const j = await gql(query, { id: tableId, first: 5000, after });
     console.log("📄 [DEBUG] Página retornada:", j.data?.table?.table_records?.edges?.map(e => e.node.title));
 
     const edges = j.data?.table?.table_records?.edges || [];
@@ -444,6 +444,7 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+
 
 
 

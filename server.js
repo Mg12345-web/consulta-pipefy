@@ -1,15 +1,21 @@
 import express from "express";
 
 const app = express();
-// REMOVA o || 8080
-const PORT = process.env.PORT; 
+const PORT = process.env.PORT || 8080;
 
-// ... rotas ...
+// rota inicial
+app.get("/", (req, res) => {
+  res.send("🚀 Servidor de teste rodando no Railway!");
+});
 
-// Assegure-se de que a porta seja um número
-const serverPort = parseInt(PORT || 3000); 
+// rota extra para confirmar
+app.get("/ping", (req, res) => {
+  res.json({
+    pong: true,
+    timestamp: new Date().toISOString(),
+  });
+});
 
-// Adicione um fallback para 3000 (ou o que quiser) se PORT for undefined (nunca deve ser no Railway)
-app.listen(serverPort, "0.0.0.0", () => {
-    console.log(`Servidor rodando na porta ${serverPort}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Servidor rodando na porta ${PORT}`);
 });

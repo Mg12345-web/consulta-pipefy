@@ -110,16 +110,11 @@ app.get("/api/anexos-by-card", async (req, res) => {
     const anexos = mapAnexos(card?.attachments || []);
 
     return res.json({
-      cardId: card?.id || null,
-      title: card?.title || null,
-      ait: anexos.find((x) => x.isAIT) || null,
-      ultimoAnexo: anexos[0] || null,
-      anexos,
-    });
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
+  cardId: card?.id || null,
+  title: card?.title || null,
+  protocolo: anexos[0] || null,  // <- só o último
 });
+
 
 // Descobrir campo conector "cliente" no pipe
 app.get("/api/discover-clientes", async (_req, res) => {
@@ -354,8 +349,20 @@ app.get("/api/anexos", async (req, res) => {
     }
 
     function montar(cards, pipeId) {
-      return cards.map((card) => {
-        const anexos = mapAnexos(card.attachments);
+  return cards.map((card) => {
+    const anexos = mapAnexos(card.attachments);
+
+    // pega somente o último (mais recente)
+    const ultimo = anexos[0] || null;
+
+    return {
+      pipeId,
+      cardId: card.id,
+      title: card.title,
+      protocolo: ultimo,   // <- aqui já vem só o protocolo
+    };
+  });
+}
 
         // extrair AIT dos fields
         let aitValue = null;
@@ -427,3 +434,4 @@ app.get("/api/anexos", async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+

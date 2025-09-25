@@ -58,12 +58,12 @@ const mapAnexos = (att = []) =>
   att
     .map((a) => {
       const url = a?.url || "";
-      const filename = decodeURIComponent(url.split("?")[0].split("/").pop() || "");
+      const filename =
+        a?.name || decodeURIComponent(url.split("?")[0].split("/").pop() || "");
       return {
         filename: filename || null,
         url,
         createdAt: a?.createdAt || null,
-        // flag simples por nome (reforçamos depois com o código do AIT)
         isAIT: /(^|[^a-z])ait([^a-z]|$)/i.test(filename),
       };
     })
@@ -99,7 +99,7 @@ app.get("/api/anexos-by-card", async (req, res) => {
         card(id: $id) {
           id
           title
-          attachments { url createdAt }
+          attachments { url createdAt name }
         }
       }
     `;
@@ -427,3 +427,4 @@ app.get("/api/anexos", async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+

@@ -321,40 +321,20 @@ app.get("/api/anexos", async (req, res) => {
     }
 
     function montar(cards, pipeId) {
-      return cards.map((card) => {
-        const anexos = mapAnexos(card.attachments);
+  return cards.map((card) => {
+    // procurar o campo "Comprovante Protocolo"
+    const comprovanteField = (card.fields || []).find((f) => 
+      /comprovante\s*protocolo/i.test(f.field?.label || "")
+    );
 
-        // extrair AIT dos fields
-        let aitValue = null;
-        if (AIT_FIELD_ID) {
-          const byId = (card.fields || []).find((f) => (f.field?.id || "") === AIT_FIELD_ID);
-          if (byId) aitValue = byId.value || null;
-        }
-        if (!aitValue) {
-          const byLabel = (card.fields || []).find((f) => /(^|\W)ait(\W|$)/i.test(f.field?.label || ""));
-          if (byLabel) aitValue = byLabel.value || null;
-        }
-
-        let anexoAIT = null;
-        if (aitValue) {
-          const code = String(aitValue).toUpperCase();
-          anexoAIT = anexos.find((a) => (a.filename || "").toUpperCase().includes(code)) || null;
-          anexos.forEach((a) => {
-            if ((a.filename || "").toUpperCase().includes(code)) a.isAIT = true;
-          });
-        }
-
-        return {
-          pipeId,
-          cardId: card.id,
-          title: card.title,
-          ait: aitValue || null,
-          anexoAIT,
-          ultimoAnexo: anexos[0] || null,
-          anexos,
-        };
-      });
-    }
+    return {
+      pipeId,
+      cardId: card.id,
+      title: card.title,
+      comprovanteProtocolo: comprovanteField ? comprovanteField.value : null,
+    };
+  });
+}
 
     // Modo deep: "0" (off), "1" (force), "auto" (fallback)
     const deepForce = deepParam === "1";
@@ -395,5 +375,6 @@ app.get("/api/anexos", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
+
 
 

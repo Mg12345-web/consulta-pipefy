@@ -1,7 +1,7 @@
 import express from "express";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // rota inicial
 app.get("/", (req, res) => {
@@ -10,9 +10,13 @@ app.get("/", (req, res) => {
 
 // rota extra para confirmar
 app.get("/ping", (req, res) => {
-  res.json({ pong: true, timestamp: new Date().toISOString() });
+  res.json({
+    pong: true,
+    timestamp: new Date().toISOString(),
+  });
 });
 
+// importante: expor no 0.0.0.0
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`✅ Servidor rodando em http://0.0.0.0:${PORT}`);
 });

@@ -291,6 +291,7 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
     }
 
     // ---- queries (com fields para extrair AIT sem chamada extra) ----
+    console.log(`🔗 [DEBUG] Buscando cards no pipe ${pipeId} para cliente ${cliente.id} (${cliente.title})`);
     const Q_PIPE_BY_CONNECTOR = `
       query($pipeId: ID!, $recordId: ID!, $first: Int!, $after: String) {
         pipe(id: $pipeId) {
@@ -450,6 +451,7 @@ async function buscaClientePorTitulo(tituloCPF, digitsCPF) {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+
 
 
 

@@ -83,32 +83,31 @@
         const cards = grupos[ait];
 
         const cardsHtml = cards.map(card => {
-        const anexosHtml = (card.anexos && card.anexos.length > 0)
-  ? card.anexos.map(a => `
-      <a class="pill" href="${a.url}" target="_blank" rel="noopener">
-        ${a.filename || 'arquivo'}
-        ${a.createdAt ? `<span class="pill__meta">${fmt.format(new Date(a.createdAt))}</span>` : ''}
-      </a>
-    `).join('')
-  : '<div class="muted">Sem anexos neste card.</div>';
+  const anexosHtml = (card.anexos && card.anexos.length > 0)
+    ? card.anexos.map(a => `
+        <a class="pill" href="${a.url}" target="_blank" rel="noopener">
+          ${a.filename || 'arquivo'}
+          ${a.createdAt ? `<span class="pill__meta">${fmt.format(new Date(a.createdAt))}</span>` : ''}
+        </a>
+      `).join('')
+    : '<div class="muted">Sem anexos neste card.</div>';
 
-
-          return `
-            <div class="card">
-              <div class="card__hdr">
-                <div class="badge badge--muted">Card:</div>
-                <div class="card__title">${card.title || card.cardId}</div>
-                <a class="badge badge--link" href="https://app.pipefy.com/open-cards/${card.cardId}" target="_blank">abrir no Pipefy ↗</a>
-                <div class="spacer"></div>
-                <div class="badge">pipe ${card.pipeId}</div>
-                ${card.ait ? `<span class="badge badge--success">AIT: ${card.ait}</span>` : ''}
-              </div>
-              <div class="card__body">
-                ${anexos || '<div class="muted">Sem anexos neste card.</div>'}
-              </div>
-            </div>
-          `;
-        }).join('');
+  return `
+    <div class="card">
+      <div class="card__hdr">
+        <div class="badge badge--muted">Card:</div>
+        <div class="card__title">${card.title || card.cardId}</div>
+        <a class="badge badge--link" href="https://app.pipefy.com/open-cards/${card.cardId}" target="_blank">abrir no Pipefy ↗</a>
+        <div class="spacer"></div>
+        <div class="badge">pipe ${card.pipeId}</div>
+        ${card.ait ? `<span class="badge badge--success">AIT: ${card.ait}</span>` : ''}
+      </div>
+      <div class="card__body">
+        ${anexosHtml}
+      </div>
+    </div>
+  `;
+}).join('');
 
         blocks.push(`
           <section class="group">
@@ -117,8 +116,8 @@
               <div class="badge">${cards.length} card(s)</div>
               <div class="spacer"></div>
               <div class="badge badge--muted">
-                ${cards.reduce((acc, c) => acc + (c.protocolo ? 1 : 0), 0)} anexo(s)
-              </div>
+  ${cards.reduce((acc, c) => acc + (c.anexos?.length || 0), 0)} anexo(s)
+</div>
             </div>
             ${cardsHtml}
           </section>
@@ -130,5 +129,6 @@
   </script>
 </body>
 </html>
+
 
 

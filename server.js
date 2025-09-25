@@ -109,12 +109,15 @@ app.get("/api/anexos-by-card", async (req, res) => {
     const card = j.data?.card || null;
     const anexos = mapAnexos(card?.attachments || []);
 
-    return res.json({
+   return res.json({
   cardId: card?.id || null,
   title: card?.title || null,
   protocolo: anexos[0] || null,  // <- só o último
 });
-
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
 
 // Descobrir campo conector "cliente" no pipe
 app.get("/api/discover-clientes", async (_req, res) => {
@@ -434,4 +437,5 @@ app.get("/api/anexos", async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+
 

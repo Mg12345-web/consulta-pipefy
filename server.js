@@ -382,7 +382,8 @@ app.get("/api/anexos", async (req, res) => {
       pipeId,
       cardId: card.id,
       title: card.title,
-      protocolo: ultimo,     // sempre só o último
+      protocolo: ultimo,     // último anexo
+      anexos,                // <-- lista completa para o index
       ait: aitValue || null, // opcional
       anexoAIT,
     };
@@ -427,5 +428,6 @@ app.get("/api/anexos", async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+
 
 

@@ -83,14 +83,12 @@
         const cards = grupos[ait];
 
         const cardsHtml = cards.map(card => {
-  const anexosHtml = (card.anexos && card.anexos.length > 0)
-    ? card.anexos.map(a => `
-        <a class="pill" href="${a.url}" target="_blank" rel="noopener">
-          ${a.filename || 'arquivo'}
-          ${a.createdAt ? `<span class="pill__meta">${fmt.format(new Date(a.createdAt))}</span>` : ''}
-        </a>
-      `).join('')
-    : '<div class="muted">Sem anexos neste card.</div>';
+  const comprovanteHtml = card.comprovanteProtocolo
+  ? `<a class="pill" href="${card.comprovanteProtocolo}" target="_blank" rel="noopener">
+       ${card.comprovanteProtocolo}
+     </a>`
+  : '<div class="muted">Sem comprovante neste card.</div>';
+
 
   return `
     <div class="card">
@@ -103,8 +101,8 @@
         ${card.ait ? `<span class="badge badge--success">AIT: ${card.ait}</span>` : ''}
       </div>
       <div class="card__body">
-        ${anexosHtml}
-      </div>
+  ${comprovanteHtml}
+</div>
     </div>
   `;
 }).join('');
@@ -129,6 +127,3 @@
   </script>
 </body>
 </html>
-
-
-

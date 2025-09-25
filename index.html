@@ -83,13 +83,15 @@
         const cards = grupos[ait];
 
         const cardsHtml = cards.map(card => {
-          const anexo = card.protocolo; // backend já envia só o último
-const anexos = anexo ? `
-  <a class="pill" href="${anexo.url}" target="_blank" rel="noopener">
-    ${anexo.filename || 'arquivo'}
-    ${anexo.createdAt ? `<span class="pill__meta">${fmt.format(new Date(anexo.createdAt))}</span>` : ''}
-  </a>
-` : '<div class="muted">Sem protocolo neste card.</div>';
+        const anexosHtml = (card.anexos && card.anexos.length > 0)
+  ? card.anexos.map(a => `
+      <a class="pill" href="${a.url}" target="_blank" rel="noopener">
+        ${a.filename || 'arquivo'}
+        ${a.createdAt ? `<span class="pill__meta">${fmt.format(new Date(a.createdAt))}</span>` : ''}
+      </a>
+    `).join('')
+  : '<div class="muted">Sem anexos neste card.</div>';
+
 
           return `
             <div class="card">
@@ -115,7 +117,7 @@ const anexos = anexo ? `
               <div class="badge">${cards.length} card(s)</div>
               <div class="spacer"></div>
               <div class="badge badge--muted">
-                ${cards.reduce((acc, c) => acc + (c.anexos?.length || 0), 0)} anexo(s)
+                ${cards.reduce((acc, c) => acc + (c.protocolo ? 1 : 0), 0)} anexo(s)
               </div>
             </div>
             ${cardsHtml}
@@ -128,4 +130,5 @@ const anexos = anexo ? `
   </script>
 </body>
 </html>
+
 

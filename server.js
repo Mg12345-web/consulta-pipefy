@@ -90,40 +90,36 @@ app.get("/api/teste", async (_req, res) => {
 
 // Anexos por card (id -> anexos)
 app.get("/api/anexos-by-card", async (req, res) => {
-
-
-// Descobrir campo conector "cliente" no pipe
-app.get("/api/discover-clientes", async (_req, res) => {
   try {
-    const firstPipeId = (process.env.PIPE_IDS || "").split(",")[0]?.trim();
-    if (!firstPipeId) return res.status(400).json({ error: "Defina PIPE_IDS no .env" });
+    const cardId = (req.query.id || "").trim();
+    if (!cardId) return res.status(400).json({ error: "Passe ?id=ID_DO_CARD" });
 
     const query = `
       query($id: ID!) {
-        pipe(id: $id) {
+        card(id: $id) {
           id
-          name
-          start_form_fields { id label type options }
+          title
+          attachments { url createdAt }
         }
       }
     `;
-    const j = await gql(query, { id: firstPipeId });
+    const j = await gql(query, { id: cardId });
     if (j.errors) return res.status(502).json(j);
 
-    const sff = j.data?.pipe?.start_form_fields || [];
-    const connector =
-      sff.find((f) => f.id === (process.env.CLIENTE_CONNECTOR_ID || "cliente")) ||
-      sff.find((f) => f.type === "connector" && /cliente/i.test(f.label || ""));
+    const card = j.data?.card || null;
+    const anexos = mapAnexos(card?.attachments || []);
+    const ultimoAnexo = anexos[0] || null;
 
     return res.json({
-      pipe: { id: j.data?.pipe?.id, name: j.data?.pipe?.name },
-      connector_detectado: connector || null,
-      dica: "Se connector_detectado.options tiver tableId/databaseId, copie para CLIENTES_TABLE_ID no .env",
+      cardId: card?.id || null,
+      title: card?.title || null,
+      ultimoAnexo,
     });
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
 });
+
 
 // Campos da tabela Clientes (para achar CPF)
 app.get("/api/clientes-fields", async (_req, res) => {
@@ -399,4 +395,5 @@ app.get("/api/anexos", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
+
 

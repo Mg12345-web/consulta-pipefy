@@ -83,12 +83,13 @@
         const cards = grupos[ait];
 
         const cardsHtml = cards.map(card => {
-          const anexos = (card.anexos || []).map(a => `
-            <a class="pill" href="${a.url}" target="_blank" rel="noopener">
-              ${a.filename || 'arquivo'}
-              ${a.createdAt ? `<span class="pill__meta">${fmt.format(new Date(a.createdAt))}</span>` : ''}
-            </a>
-          `).join('');
+          const anexo = card.protocolo; // backend já envia só o último
+const anexos = anexo ? `
+  <a class="pill" href="${anexo.url}" target="_blank" rel="noopener">
+    ${anexo.filename || 'arquivo'}
+    ${anexo.createdAt ? `<span class="pill__meta">${fmt.format(new Date(anexo.createdAt))}</span>` : ''}
+  </a>
+` : '<div class="muted">Sem protocolo neste card.</div>';
 
           return `
             <div class="card">
@@ -127,3 +128,4 @@
   </script>
 </body>
 </html>
+

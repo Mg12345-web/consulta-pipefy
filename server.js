@@ -90,36 +90,7 @@ app.get("/api/teste", async (_req, res) => {
 
 // Anexos por card (id -> anexos)
 app.get("/api/anexos-by-card", async (req, res) => {
-  try {
-    const cardId = (req.query.id || "").trim();
-    if (!cardId) return res.status(400).json({ error: "Passe ?id=ID_DO_CARD" });
 
-    const query = `
-      query($id: ID!) {
-        card(id: $id) {
-          id
-          title
-          attachments { url createdAt }
-        }
-      }
-    `;
-    const j = await gql(query, { id: cardId });
-    if (j.errors) return res.status(502).json(j);
-
-    const card = j.data?.card || null;
-    const anexos = mapAnexos(card?.attachments || []);
-
-    return res.json({
-      cardId: card?.id || null,
-      title: card?.title || null,
-      ait: anexos.find((x) => x.isAIT) || null,
-      ultimoAnexo: anexos[0] || null,
-      anexos,
-    });
-  } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
-});
 
 // Descobrir campo conector "cliente" no pipe
 app.get("/api/discover-clientes", async (_req, res) => {
@@ -428,3 +399,4 @@ app.get("/api/anexos", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
+

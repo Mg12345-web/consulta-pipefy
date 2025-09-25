@@ -54,6 +54,21 @@ async function gql(query, variables = {}) {
 
 const onlyDigits = (s = "") => s.replace(/\D/g, "");
 
+const mapAnexos = (att = []) =>
+  att
+    .map((a) => {
+      const url = a?.url || "";
+      const filename = decodeURIComponent(url.split("?")[0].split("/").pop() || "");
+      return {
+        filename: filename || null,
+        url,
+        createdAt: a?.createdAt || null,
+        // flag simples por nome (reforçamos depois com o código do AIT)
+        isAIT: /(^|[^a-z])ait([^a-z]|$)/i.test(filename),
+      };
+    })
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
 // ------------------------- rotas básicas -------------------------
 app.get("/", (_req, res) => {
   res.send("Servidor rodando com sucesso 🚀");
@@ -68,6 +83,72 @@ app.get("/api/teste", async (_req, res) => {
     const query = `query($id: ID!) { pipe(id: $id) { id name } }`;
     const j = await gql(query, { id: firstPipeId });
     return res.status(j.errors ? 502 : 200).json(j);
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
+// Anexos por card (id -> anexos)
+app.get("/api/anexos-by-card", async (req, res) => {
+  try {
+    const cardId = (req.query.id || "").trim();
+    if (!cardId) return res.status(400).json({ error: "Passe ?id=ID_DO_CARD" });
+
+    const query = `
+      query($id: ID!) {
+        card(id: $id) {
+          id
+          title
+          attachments { url createdAt }
+        }
+      }
+    `;
+    const j = await gql(query, { id: cardId });
+    if (j.errors) return res.status(502).json(j);
+
+    const card = j.data?.card || null;
+    const anexos = mapAnexos(card?.attachments || []);
+
+    return res.json({
+      cardId: card?.id || null,
+      title: card?.title || null,
+      ait: anexos.find((x) => x.isAIT) || null,
+      ultimoAnexo: anexos[0] || null,
+      anexos,
+    });
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
+// Descobrir campo conector "cliente" no pipe
+app.get("/api/discover-clientes", async (_req, res) => {
+  try {
+    const firstPipeId = (process.env.PIPE_IDS || "").split(",")[0]?.trim();
+    if (!firstPipeId) return res.status(400).json({ error: "Defina PIPE_IDS no .env" });
+
+    const query = `
+      query($id: ID!) {
+        pipe(id: $id) {
+          id
+          name
+          start_form_fields { id label type options }
+        }
+      }
+    `;
+    const j = await gql(query, { id: firstPipeId });
+    if (j.errors) return res.status(502).json(j);
+
+    const sff = j.data?.pipe?.start_form_fields || [];
+    const connector =
+      sff.find((f) => f.id === (process.env.CLIENTE_CONNECTOR_ID || "cliente")) ||
+      sff.find((f) => f.type === "connector" && /cliente/i.test(f.label || ""));
+
+    return res.json({
+      pipe: { id: j.data?.pipe?.id, name: j.data?.pipe?.name },
+      connector_detectado: connector || null,
+      dica: "Se connector_detectado.options tiver tableId/databaseId, copie para CLIENTES_TABLE_ID no .env",
+    });
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
@@ -95,7 +176,17 @@ app.get("/api/clientes-fields", async (_req, res) => {
   }
 });
 
-// ------------------------- rota principal: CPF -> Comprovante Protocolo -------------------------
+// ------------------------- rota principal: CPF -> anexos (+ AIT) -------------------------
+/**
+ * CPF -> cliente (tabela) -> cards conectados nos pipes -> anexos + AIT
+ * Estratégia:
+ *   - 1ª passada rápida por conector (paralela e paginada)
+ *   - se nada encontrado e deep ≠ 0: fallback automático varrendo phases
+ * Flags:
+ *   deep=0 (só rápida) | deep=1 (força profundo) | padrão = auto-fallback
+ *   nocache=1 (ignora cache) | debug=1 (métricas)
+ * GET /api/anexos?cpf=103.142.726-07
+ */
 app.get("/api/anexos", async (req, res) => {
   const t0 = Date.now();
   try {
@@ -107,6 +198,7 @@ app.get("/api/anexos", async (req, res) => {
 
     const tableId = (process.env.CLIENTES_TABLE_ID || "").trim();
     const cpfFieldId = (process.env.CPF_FIELD_ID || "").trim();
+    const AIT_FIELD_ID = (process.env.AIT_FIELD_ID || "").trim(); // opcional
     const pipeIds = (process.env.PIPE_IDS || "").split(",").map((x) => x.trim()).filter(Boolean);
 
     if (!tableId || pipeIds.length === 0) {
@@ -178,7 +270,7 @@ app.get("/api/anexos", async (req, res) => {
       return res.json(empty);
     }
 
-    // ---- queries (com fields para extrair AIT e Comprovante Protocolo) ----
+    // ---- queries (com fields para extrair AIT sem chamada extra) ----
     const Q_PIPE_BY_CONNECTOR = `
       query($pipeId: ID!, $recordId: ID!, $first: Int!, $after: String) {
         pipe(id: $pipeId) {
@@ -188,13 +280,33 @@ app.get("/api/anexos", async (req, res) => {
               id
               title
               fields { value field { id label type } }
+              attachments { url createdAt }
+            } }
+          }
+        }
+      }
+    `;
+    const Q_PIPE_PHASES = `
+      query($pipeId: ID!) { pipe(id: $pipeId) { id name phases { id name } } }
+    `;
+    const Q_PHASE_CARDS = `
+      query($phaseId: ID!, $first: Int!, $after: String) {
+        phase(id: $phaseId) {
+          cards(first: $first, after: $after) {
+            pageInfo { hasNextPage endCursor }
+            edges { node {
+              id
+              title
+              fields { value field { id label type } }
+              attachments { url createdAt }
             } }
           }
         }
       }
     `;
 
-    async function coletaCardsDePipe(pipeId) {
+    async function coletaCardsDePipe(pipeId, deepScan) {
+      // 1) por conector
       const edgesConnector = [];
       let after = null;
       for (let i = 0; i < 50; i++) {
@@ -205,41 +317,102 @@ app.get("/api/anexos", async (req, res) => {
         if (!pi?.hasNextPage) break;
         after = pi.endCursor;
       }
-      return { cards: edgesConnector.map((e) => e.node) };
+
+      // 2) por fases (opcional)
+      const edgesPhase = [];
+      if (deepScan) {
+        const phasesJson = await gql(Q_PIPE_PHASES, { pipeId });
+        const phases = phasesJson.data?.pipe?.phases || [];
+        for (const ph of phases) {
+          let afterP = null;
+          for (let i = 0; i < 50; i++) {
+            const j = await gql(Q_PHASE_CARDS, { phaseId: ph.id, first: 100, after: afterP });
+            const list = j.data?.phase?.cards?.edges || [];
+            const filtered = list.filter((e) => {
+              const t = (e.node?.title || "").trim();
+              return t.includes(cpfInput) || (digits && t.replace(/\D/g, "").includes(digits));
+            });
+            edgesPhase.push(...filtered);
+            const pi = j.data?.phase?.cards?.pageInfo;
+            if (!pi?.hasNextPage) break;
+            afterP = pi.endCursor;
+          }
+        }
+      }
+
+      // unir & deduplicar
+      const edges = [...edgesConnector, ...edgesPhase];
+      const seen = new Set();
+      const cards = [];
+      for (const e of edges) {
+        const n = e.node;
+        if (!n?.id || seen.has(n.id)) continue;
+        seen.add(n.id);
+        cards.push(n);
+      }
+      return { cards, counts: { byConnector: edgesConnector.length, byTitleViaPhases: edgesPhase.length } };
     }
 
     function montar(cards, pipeId) {
       return cards.map((card) => {
-        const aitField = (card.fields || []).find((f) =>
-          /(^|\W)ait(\W|$)/i.test(f.field?.label || "")
-        );
-        const ait = aitField ? aitField.value : null;
+        const anexos = mapAnexos(card.attachments);
 
-        const comprovanteField = (card.fields || []).find((f) =>
-          /comprovante\s*protocolo/i.test(f.field?.label || "")
-        );
-        const comprovanteProtocolo = comprovanteField ? comprovanteField.value : null;
+        // extrair AIT dos fields
+        let aitValue = null;
+        if (AIT_FIELD_ID) {
+          const byId = (card.fields || []).find((f) => (f.field?.id || "") === AIT_FIELD_ID);
+          if (byId) aitValue = byId.value || null;
+        }
+        if (!aitValue) {
+          const byLabel = (card.fields || []).find((f) => /(^|\W)ait(\W|$)/i.test(f.field?.label || ""));
+          if (byLabel) aitValue = byLabel.value || null;
+        }
+
+        let anexoAIT = null;
+        if (aitValue) {
+          const code = String(aitValue).toUpperCase();
+          anexoAIT = anexos.find((a) => (a.filename || "").toUpperCase().includes(code)) || null;
+          anexos.forEach((a) => {
+            if ((a.filename || "").toUpperCase().includes(code)) a.isAIT = true;
+          });
+        }
 
         return {
           pipeId,
           cardId: card.id,
           title: card.title,
-          ait,
-          comprovanteProtocolo,
+          ait: aitValue || null,
+          anexoAIT,
+          ultimoAnexo: anexos[0] || null,
+          anexos,
         };
       });
     }
 
-    // busca nos pipes
-    let results = await Promise.all(pipeIds.map((id) => coletaCardsDePipe(id)));
+    // Modo deep: "0" (off), "1" (force), "auto" (fallback)
+    const deepForce = deepParam === "1";
+    const deepOff = deepParam === "0";
+
+    // 1ª passada rápida (deep=false), paralela
+    let results = await Promise.all(pipeIds.map((id) => coletaCardsDePipe(id, deepForce)));
     let cardsResult = [];
     results.forEach(({ cards }, idx) => (cardsResult = cardsResult.concat(montar(cards, pipeIds[idx]))));
+
+    // fallback automático se nada encontrado e deep ≠ 0
+    let deepAutoUsed = false;
+    if (!cardsResult.length && !deepOff && !deepForce) {
+      deepAutoUsed = true;
+      results = await Promise.all(pipeIds.map((id) => coletaCardsDePipe(id, true)));
+      cardsResult = [];
+      results.forEach(({ cards }, idx) => (cardsResult = cardsResult.concat(montar(cards, pipeIds[idx]))));
+    }
 
     const response = { cpf: cpfInput, cliente, cards: cardsResult };
     if (debugFlag) {
       response.debug = {
-        perPipe: results.map((r, i) => ({ pipeId: pipeIds[i], count: r.cards.length })),
+        perPipe: results.map((r, i) => ({ pipeId: pipeIds[i], ...r.counts })),
         timeMs: Date.now() - t0,
+        deepMode: deepForce ? "force" : deepOff ? "off" : deepAutoUsed ? "auto-fallback" : "fast",
         fromCache: false,
       };
     }
